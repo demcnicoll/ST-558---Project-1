@@ -1,0 +1,32 @@
+---
+title: "Project 1 Json"
+author: "Devyn McNicoll"
+date: "October 17, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+```{r}
+library(jsonlite)
+library(tidyverse)
+library(XML)
+library(methods)
+
+jsondata <- fromJSON("C:\\Users\\dmcnic1\\Documents\\ST 558\\theater.json")
+results <- jsondata[['results']]
+
+
+results <- tbl_df(results)
+head(results)
+
+results <- results %>% select(english,num_views, today_screens, min_screens, fav, stars, id, status)
+head(results)
+
+
+```
+

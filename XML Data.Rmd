@@ -1,0 +1,31 @@
+---
+title: "Project 1 XML"
+author: "Devyn McNicoll"
+date: "October 17, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## XML - An Explanation
+
+Extensive Markup Language or XML is widely used to describe data.  It is similar to HTML in that they both use markup symbols to describe their contents.  Markup symbols are character sequences or symbols that help the computer to understand how the data should be structured.  For more info on markup symbols check out this website.  https://whatis.techtarget.com/definition/markup  
+because of the use of markup symbols, XML files describe themselves and do not reuire the end user to do any building on their end in order to house and veiw the data.  In that way, it can be very helpful when sharing data across the internet and within corporate structures.  The infomration here is paraphased from this webpage. 
+https://whatis.techtarget.com/definition/XML-Extensible-Markup-Language
+XML uses elements that are defined by specific markup symbols called "tags" that mark the beginning and the end of an element.  The outermost element is called the "root element", which allow XML files to introduce hierarcy.  
+
+## Packages
+There are two main packages for reading in XML documents.  The first package is XML and the second is called XML2
+
+```{r}
+wsudata <- xmlParse(file = "C:\\Users\\dmcnic1\\Documents\\ST 558\\wsudata.xml")
+rootnode <- xmlRoot(wsudata)
+rootsize <- xmlSize(rootnode)
+print(rootnode[1])
+
+xmldf <- xmlToDataFrame("C:\\Users\\dmcnic1\\Documents\\ST 558\\wsudata.xml") 
+head(xmldf))
+```
+
