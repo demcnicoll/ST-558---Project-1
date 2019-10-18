@@ -1,32 +1,90 @@
 ---
-title: "Project 1 Json"
+title: "Project 1 JSON"
 author: "Devyn McNicoll"
 date: "October 17, 2019"
-output: html_document
+output:
+  html_document:
+    toc: true
+    toc_depth: 1
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message=FALSE)
 ```
 
-## R Markdown
+# JSON - An Explanation
+JavaScript Object Notation or JSON for short is a widely used data format used for transpoting and storing data.  JSON stores information by text which makes it readable and storable whereas JAVA does not always have that function.  This means that JSONs can be read by any programming language which makes it nifty for sharing data.  It is also considered "easy to read" by most standards.  According to the [wiki page](https://en.wikipedia.org/wiki/JSON), JSONs have 6 basic data types that include number, object, boolean, array, string and null.  In addition, JSONs use space, horizontal tab, line feed, and carriage return as whitespace to seperate syntactic elements.  JSONs do not seperate metadata from the actual data in the way that an XML file does.  It is an alternative to using XML.
+
+JSON is built on two structures, a collection of name/value pairs and an ordered list of values.  The following picture from [this website](https://stackoverflow.com/questions/383692/what-is-json-and-why-would-i-use-it) helps describe the process.
+ 
+# Packages
+There are three main packages for reading in JSON data: RJSONIO, jsonlite, and rjson.  RJSONIO has two main functions that convert objects to R and convert JSONs to R objects called toJSON and fromJSON.  The jsonlite package is similar to the prior package but it helps R to map the data better than RJSONIO.  There's a great tuturial that I learned a lot of this information from [here.](https://github.com/gastonstat/tutorial-R-web-data/blob/master/05-json-data/05-json-data.pdf).  THe rjson package is more fundamental than both the other packages.  It always simplifies where possible and does not have as much functionality.  There are A LOT of opinions online but I went with jasonlite as it seemed like it was the most updated and sophiisticated way to read in JSON data to R.
+
+#Data
+I obtained my data from a [json dataset page](https://github.com/jdorfman/awesome-json-datasets) on GitHub.  The sample dataset is a small JSON dataset that describes movie theaters in Thailand.  It includes the names of the movie theaters, the number of views, the number of screenings, minimum number of screens, the rating in stars.  There are other variables in the dataset that we will not consider.  Unfortunatley, there is no provided information on how this data was collected.  For the purpose of this assignment, I will treat minimum screens and stars as categorical variables and number of views and todays screenings as numeric variables.
+
+
 
 ```{r}
 library(jsonlite)
 library(tidyverse)
-library(XML)
-library(methods)
+library(ggplot2)
+library(knitr)
 
-jsondata <- fromJSON("C:\\Users\\dmcnic1\\Documents\\ST 558\\theater.json")
+#use fromJSON to read in the data from the project location
+jsondata <- fromJSON("theater.json")
+
+#if we double click on the jsondata we just created we can see the list of objects that are included and that the data is stored under the list titled "Results" so we want to extract that list
 results <- jsondata[['results']]
 
-
+#convert data into a tibble.
 results <- tbl_df(results)
-head(results)
-
-results <- results %>% select(english,num_views, today_screens, min_screens, fav, stars, id, status)
-head(results)
 
 
+#select just the data we want to see and create a varible that divides min_screens/ today_screens so that we could possible 
+results <- results %>% select(english,num_views, today_screens, min_screens, stars) %>% mutate(TodayByMinScreens = min_screens / today_screens)
+
+#Write a function that creates a variable describing the theaters rating 
+ratingFun = function(x,...){
+  rating = ifelse(x<2,"AWFUL",
+                          ifelse(x<3,"BAD",
+                                 ifelse(x<5,"OKAY", "GOOD")))
+}
+
+results$rating <- ratingFun(results$stars)
 ```
+
+Let's lookat some descriptive stats and contengency tables.
+
+```{r}
+#create a contengency table of Rating by min_screens
+table(results$rating, results$min_screens)
+
+#create a contengency table of Rating by today_views
+table(results$rating, results$today_screens)
+
+#use summary function to get stats on numeric variables
+summary(results$today_screens)
+
+summary(results$num_views)
+```
+The data is limited but we can still create some graphs!
+
+```{r}
+
+#we can make a side by side bar chart of rating by min screens but first we need to make min_screens a factor variable so it will work in the barchart.  The graph isn't very interesting because the data is limited.  
+results$min_screens <- as.factor(results$min_screens)
+ggplot(data = results, aes(x=rating)) + geom_bar(aes(fill = min_screens), position = "dodge") + xlab("Rating by Minimum Number of Screens")
+
+# create a boxplot that shows the amount of overall views by rating
+ggplot(results, aes(x = rating, y = num_views)) + geom_boxplot() + geom_jitter(aes(color = rating)) + ggtitle("Boxplot for Number of Views by Rating")
+
+#create a scatter plot that shows enrolled vs. limit, add a 45 degree line so we can get a feel fo the portion of classes that are over enrolled
+scatter <- ggplot(results, aes(x = today_screens, y = num_views)) + geom_point(color="blue") + ggtitle("Scatterplot for Overall Views vs. Todays Views")
+scatter + theme_grey()
+```
+
+The boxplot shows us something that is expected but might be worth looking into.  It looks like the higher the rating the higher the overall views.  In addition, if we had more data, we might be able to test a hypothethis that the overall views can be predicted by the number of today's screenings.
+
+
 

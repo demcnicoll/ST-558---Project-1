@@ -2,30 +2,113 @@
 title: "Project 1 XML"
 author: "Devyn McNicoll"
 date: "October 17, 2019"
-output: html_document
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message=FALSE)
 ```
 
-## XML - An Explanation
+# XML - An Explanation
 
-Extensive Markup Language or XML is widely used to describe data.  It is similar to HTML in that they both use markup symbols to describe their contents.  Markup symbols are character sequences or symbols that help the computer to understand how the data should be structured.  For more info on markup symbols check out this website.  https://whatis.techtarget.com/definition/markup  
-because of the use of markup symbols, XML files describe themselves and do not reuire the end user to do any building on their end in order to house and veiw the data.  In that way, it can be very helpful when sharing data across the internet and within corporate structures.  The infomration here is paraphased from this webpage. 
-https://whatis.techtarget.com/definition/XML-Extensible-Markup-Language
-XML uses elements that are defined by specific markup symbols called "tags" that mark the beginning and the end of an element.  The outermost element is called the "root element", which allow XML files to introduce hierarcy.  
+Extensive Markup Language or XML is widely used to describe data.  It is similar to HTML in that they both use markup symbols to describe their contents.  Markup symbols are character sequences or symbols that help the computer to understand how the data should be structured.  For more info on markup symbols check out [this website.](https://whatis.techtarget.com/definition/markup)  
+because of the use of markup symbols, XML files describe themselves and do not reuire the end user to do any building on their end in order to house and veiw the data.  In that way, it can be very helpful when sharing data across the internet and within corporate structures. XML uses elements that are defined by specific markup symbols called "tags" that mark the beginning and the end of an element.  The outermost element is called the "root element", which allow XML files to introduce hierarcy.  The information here is learned from [this webpage.](https://whatis.techtarget.com/definition/XML-Extensible-Markup-Language)
 
-## Packages
-There are two main packages for reading in XML documents.  The first package is XML and the second is called XML2
+# Packages
+There are two main packages for reading in XML documents.  The first package is XML and the second is called xml2.  Both packages have similar goals.  THe XML package is a bit older and no longer maintained in the way that xml2 is.  THe following xml2 advantages were taken from the [this webpage.](https://www.rdocumentation.org/packages/xml2/versions/1.2.2)
 
+  1. xml2 takes care of memory management for you. It will automatically free the memory used by an XML       document as soon as the last reference to it goes away.
+
+  2. xml2 has a very simple class hierarchy so don't need to think about exactly what type of object you      have, xml2 will just do the right thing.
+
+  3. More convenient handling of namespaces in Xpath expressions - see xml_ns() and xml_ns_strip() to get      started.
+  
+While xml2 does have these advantages, I chose to use the XML package as it is still widely used and there is a lot of examples and videos online of explaining how to use the package.  Note that there are other packages available to help coders read in, parse and understand XML data that aren't covered here. 
+
+# Data
+The data that I choose to use for this project describes classes available at WSU. The data was obtained from the [UW XML Data Repository.](http://aiweb.cs.washington.edu/research/projects/xmltk/xmldata/www/repository.html).  According to the depository, the data consists of "course data derived from universtiy websites".  In our case, we will be looking at the prefix (course department), Title of course, days on whcih the course is offered, times of the classes, number of students limit and number of students enrolled.
 ```{r}
-wsudata <- xmlParse(file = "C:\\Users\\dmcnic1\\Documents\\ST 558\\wsudata.xml")
-rootnode <- xmlRoot(wsudata)
-rootsize <- xmlSize(rootnode)
-print(rootnode[1])
+#allow R to use the following packages
+library(XML)
+library(methods)
+library(tidyverse)
+library(lubridate)
+library(ggplot2)
+library(knitr)
 
-xmldf <- xmlToDataFrame("C:\\Users\\dmcnic1\\Documents\\ST 558\\wsudata.xml") 
-head(xmldf))
+# Use xmlParse to parse the data appropriately into the XML tree.
+wsudata <- xmlParse(file = "wsudata.xml")
+
+#xmlRoot allows us to access top level node objects
+rootnode <- xmlRoot(wsudata)
+
+#xmlSize counts the size of the rootnodes, in our case it is counting the number of observations we will see in the data
+rootsize <- xmlSize(rootnode)
+
+#xmlToDataFrame converts the XML into a dataframe which we can then manipulate.
+xmldf <- xmlToDataFrame("wsudata.xml") 
 ```
 
+Great!  We now have our data in a dataframe.  Lets manipulate it so that we can use it.  This section will involve explicit conversion of formats, creating a function that counts the number of times a class is held in a week, filtering down the data so that it's easier to look at and analyze, and creating some new variables that might be beneficial.  Oh!, and don't forget to get rid of those pesky NAs.  For the purpose of this assgnment, we will just omit them all.
+```{r}
+#since all variable were converted to factors, reformat the numeric and time variables.
+xmldf$enrolled <- as.numeric(xmldf$enrolled)
+xmldf$limit <- as.numeric(xmldf$limit)
+xmldf$times <- as.POSIXct(xmldf$times, format = "%H:%M")
+xmldf$days <- as.character(xmldf$days)
+
+#create a function that counts the number of days that a class is held per week
+NumDayFun <- function(x,...){
+  NumClassDays <- ifelse(str_count(x,",")==3,4,
+                         ifelse(str_count(x,",")==2,3,
+                         ifelse(str_count(x,",")==1,2,
+                         ifelse(x=="MWF",3,
+                         ifelse(x=="TUTH",2,1)))))
+}
+
+#select the variable of intrest, create some variables to use for analysis including a transformed hour variable that signifies the hour of the class start time and a variable called open that describes the amount of open seats left in the class.
+xmldf <- xmldf %>% select(prefix,sect, title, days, times, instructor, limit, enrolled) %>% filter(prefix %in% c("ECON", "GEOL", "ENGL", "MATH")) %>% mutate(hour = floor_date(times, unit = "1 hour"), hour = sprintf("%02d:00", hour(times)))  %>% mutate(open = limit - enrolled) %>% mutate(numDays = NumDayFun(days))
+
+#omit any rows with NAs
+xmldf <- na.omit(xmldf)
+```
+We can extract some information and summeries from our data to get a better feel for what we are working with.
+```{r}
+# look at the 4 chosen class types and how many days a week those classes meet
+tbl1<- table(xmldf$numDays, droplevels(xmldf$prefix))
+kable(tbl1, caption = "Class days per week by class types")
+# check out how many times various classes are offered.
+tbl <- table(droplevels(xmldf$title))
+kable(head(tbl,20), caption = "Class offerings")
+
+math <- summary(xmldf %>% filter(prefix == "MATH") %>% select(open))
+kable(math, caption="Summary of number of open spots in a Math class")
+
+econ <- summary(xmldf %>% filter(prefix == "ECON") %>% select(open))
+kable(math, caption="Summary of number of open spots in a Econ class")
+
+engl <- summary(xmldf %>% filter(prefix == "ENGL") %>% select(open))
+kable(math, caption="Summary of number of open spots in a Engligh class")
+
+geol <- summary(xmldf %>% filter(prefix == "GEOL") %>% select(open))
+kable(math, caption="Summary of number of open spots in a Geology class")
+```
+
+
+Cool, now we have some pretty neat data!  Lets check out some graphs using the ggplot package.  
+```{r}
+#create a side by side barplot that shows number of classes per week split by class topic
+ggplot(data = xmldf, aes(x=numDays)) + geom_bar(aes(fill = prefix), position = "dodge") + xlab("Number of classes per week")
+
+# create a boxplot that shows the amount of open seats by classa type
+ggplot(xmldf, aes(x = prefix, y = open)) + geom_boxplot() + geom_jitter(aes(color = prefix)) + ggtitle("Boxplot for Open Class Seats by Department")
+
+#create a scatter plot that shows enrolled vs. limit, add a 45 degree line so we can get a feel fo the portion of classes that are over enrolled
+scatter <- ggplot(xmldf, aes(x = enrolled, y = limit)) + geom_point(color="green") + ggtitle("Scatterplot for Enrolled Vs. Limit")
+scatter + geom_abline(intercept = 0,slope = 1, color = "blue") + theme_grey()
+```
+
+The graphs show some interesting things.  One thing to look into is, why are so many of the courses overbooked (i.e more students enrolled than the limit)?  It would be interesting to look into this further to see what's driving that and if we could pin those classes down by department.
